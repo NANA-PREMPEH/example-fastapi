@@ -15,19 +15,37 @@ router = APIRouter(
 # @router.get("/", response_model=List[schemas.Post])
 @router.get("/", response_model=List[schemas.PostOut])  # response_model specifies the schema to use for the response
 def  get_posts(db: Session = Depends(get_db), 
-               current_user: int = Depends(oauth2.get_current_user), limit: int = 10, 
-               skip: int = 0, search: Optional[str] = ""):
+               current_user: int = Depends(oauth2.get_current_user), 
+               limit: int = 10, skip: int = 0, search: Optional[str] = ""):
     # cursor.execute("""SELECT * FROM posts""")
     # posts = cursor.fetchall()
-    print(limit)
+    # print(limit) # commented
 
     # Fetch all posts from the database from just the current user
     # posts = db.query(models.Post).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()
+    
 
-    posts = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
+# commented for erroor solving and change posts to results
+    results = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
         models.Vote, models.Vote.post_id == models.Post.id, isouter=True).group_by(models.Post.id).filter(
             models.Post.title.contains(search)).limit(limit).offset(skip).all()
-
+        
+    # Transform the results to match PostOut schema
+    posts = []
+    for post, votes in results:
+        post_dict = {
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
+            "published": post.published,
+            "created_at": post.created_at,
+            "owner_id": post.owner_id,
+            "owner": post.owner,
+            "votes": votes
+        }
+        posts.append(post_dict)
+    
+    
     return posts
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)  # 201 Created is the standard response for a successful POST request
@@ -52,15 +70,34 @@ def get_post(id: int, db: Session = Depends(get_db),
     # post = cursor.fetchone()
     # post = db.query(models.Post).filter(models.Post.id == id).first()
     
-    post = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
+    # commented for error correction
+    # post = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
+    #     models.Vote, models.Vote.post_id == models.Post.id, isouter=True).group_by(models.Post.id).filter(
+    #         models.Post.id == id).first()
+    
+    # return post
+    
+     # Get the query result
+    result = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
         models.Vote, models.Vote.post_id == models.Post.id, isouter=True).group_by(models.Post.id).filter(
             models.Post.id == id).first()
 
-    if not post:
+    if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                             detail=f"Post with id {id} was not found")
 
-    return post
+    # Transform the result to match PostOut schema
+    post, votes = result
+    return {
+        "id": post.id,
+        "title": post.title,
+        "content": post.content,
+        "published": post.published,
+        "created_at": post.created_at,
+        "owner_id": post.owner_id,
+        "owner": post.owner,
+        "votes": votes
+    }
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)  # 204 No Content is the standard response for a successful DELETE request

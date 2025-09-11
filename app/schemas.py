@@ -27,8 +27,24 @@ class Post(PostBase):
     class Config:
         orm_mode = True
 
-class PostOut(PostBase):
-    Post: Post
+# class PostOut(PostBase):
+#     post: Post
+#     votes: int
+    
+    
+#     class Config:
+#         orm_mode = True
+        
+        
+# Replace your PostOut class in app/schemas.py with this:
+class PostOut(BaseModel):
+    id: int
+    title: str
+    content: str
+    published: bool
+    created_at: datetime
+    owner_id: int
+    owner: UserOut
     votes: int
     
     class Config:
